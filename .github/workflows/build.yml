@@ -1,0 +1,51 @@
+name: Build Kivy Android APK
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04 # Image OS plus stable
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev build-essential libtinfo-dev
+          # Forcer la version Buildozer stable pour cet environnement
+          pip install buildozer==1.4.0 cython
+      
+      # SOLUTION FINALE POUR AIDL/LICENCE : INSTALLATION MANUELLE ET FORCÉE DU SDK
+      - name: Forcer le téléchargement des Build-Tools et l'acceptation des licences
+        run: |
+          # 1. Mise à jour de Buildozer et téléchargement initial des outils
+          buildozer android update
+          
+          # 2. Localiser l'outil sdkmanager
+          # Cette commande trouve l'exécutable sdkmanager dans la structure Buildozer
+          SDKMANAGER=$(find ~/.buildozer/android/platform/android-sdk/cmdline-tools/ -name sdkmanager -type f)
+          
+          # 3. Forcer l'acceptation de TOUTES les licences
+          yes | $SDKMANAGER --licenses
+          
+          # 4. Installer les build-tools et plateformes qui étaient bloqués (en ciblant les API 27)
+          yes | $SDKMANAGER "build-tools;30.0.3" "platforms;android-27"
+          
+      - name: Run Buildozer
+        run: buildozer android debug
+        
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MonCalculatriceAPK
+          path: bin/*.apk
